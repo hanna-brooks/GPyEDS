@@ -1,12 +1,12 @@
 import gpflow
 import gpflux
-import tensorflow as tf
-import matplotlib.pylab as plt
 import numpy as np
-from pathlib import Path
-import os
+import tensorflow as tf
 
-def create_two_layer_GPAM_from_data(input_data, num_inducing = 50, return_layers = False, n_latent = 2):
+
+def create_two_layer_GPAM_from_data(
+    input_data, num_inducing=50, return_layers=False, n_latent=2
+):
     """Generator function to create 2 layer GP using GPFlux given a dataset and its dimensions etc.
 
     Args:
@@ -21,19 +21,25 @@ def create_two_layer_GPAM_from_data(input_data, num_inducing = 50, return_layers
 
     num_data = input_data.shape[0]
 
-    Z = input_data[np.random.choice(input_data.shape[0], size = num_inducing)]
-    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1]*input_data.shape[1])
+    Z = input_data[np.random.choice(input_data.shape[0], size=num_inducing)]
+    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * input_data.shape[1])
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
     gp_layer1 = gpflux.layers.GPLayer(
-        kernel1, inducing_variable1, num_data=num_data, num_latent_gps=n_latent, mean_function=gpflow.mean_functions.Zero()
-    ) 
+        kernel1,
+        inducing_variable1,
+        num_data=num_data,
+        num_latent_gps=n_latent,
+        mean_function=gpflow.mean_functions.Zero(),
+    )
 
-    kernel2 = gpflow.kernels.SquaredExponential(lengthscales=[1]*n_latent)
-    inducing_variable2 = gpflow.inducing_variables.InducingPoints(np.random.rand(num_inducing,n_latent))
+    kernel2 = gpflow.kernels.SquaredExponential(lengthscales=[1] * n_latent)
+    inducing_variable2 = gpflow.inducing_variables.InducingPoints(
+        np.random.rand(num_inducing, n_latent)
+    )
     gp_layer2 = gpflux.layers.GPLayer(
         kernel2,
         inducing_variable2,
-        num_data=num_data, 
+        num_data=num_data,
         num_latent_gps=input_data.shape[1],
         mean_function=gpflow.mean_functions.Zero(),
     )
@@ -47,9 +53,12 @@ def create_two_layer_GPAM_from_data(input_data, num_inducing = 50, return_layers
         return model, gp_layer1, gp_layer2
     else:
         return model
-    
-def create_two_layer_GPAM_from_scratch(num_input, num_data = 1, Z = None, num_inducing = 50, return_layers = False, n_latent = 2):
-    """Generator function to create two layer GPAM model in GPFlux. 
+
+
+def create_two_layer_GPAM_from_scratch(
+    num_input, num_data=1, Z=None, num_inducing=50, return_layers=False, n_latent=2
+):
+    """Generator function to create two layer GPAM model in GPFlux.
     Args:
         num_input (int): Number of input dimensions.
         num_data (int, optional): Number of data points used for training, important to calculate loss properly. Defaults to 1.
@@ -67,14 +76,20 @@ def create_two_layer_GPAM_from_scratch(num_input, num_data = 1, Z = None, num_in
     else:
         Z = np.random.rand(num_inducing, num_input)
 
-    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1]*num_input)
+    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * num_input)
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
     gp_layer1 = gpflux.layers.GPLayer(
-        kernel1, inducing_variable1, num_data=num_data, num_latent_gps=n_latent,mean_function=gpflow.mean_functions.Zero()
+        kernel1,
+        inducing_variable1,
+        num_data=num_data,
+        num_latent_gps=n_latent,
+        mean_function=gpflow.mean_functions.Zero(),
     )
 
-    kernel2 = gpflow.kernels.SquaredExponential(lengthscales=[1]*n_latent)
-    inducing_variable2 = gpflow.inducing_variables.InducingPoints(np.random.rand(num_inducing,n_latent))
+    kernel2 = gpflow.kernels.SquaredExponential(lengthscales=[1] * n_latent)
+    inducing_variable2 = gpflow.inducing_variables.InducingPoints(
+        np.random.rand(num_inducing, n_latent)
+    )
     gp_layer2 = gpflux.layers.GPLayer(
         kernel2,
         inducing_variable2,
@@ -93,28 +108,30 @@ def create_two_layer_GPAM_from_scratch(num_input, num_data = 1, Z = None, num_in
     else:
         return model
 
-def model_inference(data, encoder,batch_size=20000):
-    """ Utility function for batched model inference to reduce memory usage. 
+
+def model_inference(data, encoder, batch_size=20000):
+    """Utility function for batched model inference to reduce memory usage.
 
     Args:
         data (ndarray): Data to be used for inference.
-        encoder (model layer): Encoding layer(s) from GPAM model to use for inference. 
+        encoder (model layer): Encoding layer(s) from GPAM model to use for inference.
         batch_size (int, optional): Size of batch to use - this depends on memory to be used. Defaults to 20000.
 
     Returns:
         latents (tuple of 2 ndarrays): Mean and variance of latent distributions for every data point.
     """
     import tqdm
-    max_iter = len(data)/batch_size
+
+    max_iter = len(data) / batch_size
     means = []
     vars = []
-    for i in tqdm.tqdm(range(int(max_iter)+1)):
+    for i in tqdm.tqdm(range(int(max_iter) + 1)):
         if max_iter - i < 0:
-            res = encoder(data[batch_size*i:])
+            res = encoder(data[batch_size * i :])
         else:
-            res = encoder(data[batch_size*i:batch_size*(i+1)])
+            res = encoder(data[batch_size * i : batch_size * (i + 1)])
 
         means.append(res.mean())
         vars.append(res.variance())
 
-    return np.concatenate(means, axis = 0), np.concatenate(vars, axis = 0)
+    return np.concatenate(means, axis=0), np.concatenate(vars, axis=0)

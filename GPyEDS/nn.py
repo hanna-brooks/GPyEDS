@@ -1,12 +1,8 @@
-import os
-import numpy as np
-from pathlib import Path
-import os
 import tensorflow as tf
 
 
-def create_nn_AE(input_dim, latent_dim = 2, hidden = [10], activation = "relu"):
-    """Generator function for neural network autoencoder architecture. 
+def create_nn_AE(input_dim, latent_dim=2, hidden=[10], activation="relu"):
+    """Generator function for neural network autoencoder architecture.
 
     Args:
         input_dim (int): Input dimensions for model.
@@ -21,7 +17,11 @@ def create_nn_AE(input_dim, latent_dim = 2, hidden = [10], activation = "relu"):
     enc_list = []
     for i in range(len(hidden)):
         if i == 0:
-            enc_list.append(tf.keras.layers.Dense(hidden[i], input_dim=input_dim, activation=activation))
+            enc_list.append(
+                tf.keras.layers.Dense(
+                    hidden[i], input_dim=input_dim, activation=activation
+                )
+            )
         else:
             enc_list.append(tf.keras.layers.Dense(hidden[i], activation=activation))
         enc_list.append(tf.keras.layers.LayerNormalization())
@@ -29,7 +29,7 @@ def create_nn_AE(input_dim, latent_dim = 2, hidden = [10], activation = "relu"):
 
     dec_list = []
     for i in range(len(hidden)):
-        dec_list.append(tf.keras.layers.Dense(hidden[::-1][i], activation = activation))
+        dec_list.append(tf.keras.layers.Dense(hidden[::-1][i], activation=activation))
         dec_list.append(tf.keras.layers.LayerNormalization())
         dec_list.append(tf.keras.layers.LeakyReLU(0.02))
 
@@ -41,7 +41,8 @@ def create_nn_AE(input_dim, latent_dim = 2, hidden = [10], activation = "relu"):
 
     decoder = tf.keras.Sequential(dec_list)
 
-    model = tf.keras.Model(inputs = [encoder.input], outputs = [decoder(latent(encoder.output))])
+    model = tf.keras.Model(
+        inputs=[encoder.input], outputs=[decoder(latent(encoder.output))]
+    )
 
     return model, (encoder, latent, decoder)
-
