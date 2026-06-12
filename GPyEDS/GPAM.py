@@ -1,81 +1,171 @@
+"""Native GPflow Deep Gaussian Process implementation for GPAM models.
+
+This module provides a 2-layer Deep GP using pure gpflow, replacing the
+previously abandoned gpflux dependency.  The variational inference follows
+Doubly Stochastic Variational Inference (Salimbeni & Deisenroth, 2017),
+using whitened parameterization for numerical stability.
+"""
+
 import typing as t
+from pathlib import Path
 
 import gpflow
 import numpy as np
 import numpy.typing as npt
 import tensorflow as tf
 import tensorflow_probability as tfp
+from gpflow.base import TensorType
 
 tfd = tfp.distributions
 
+
 class GPLayer(gpflow.Module):
-    """Native GPflow implementation of a Variational GP Layer for Deep GPs."""
-    def __init__(self, kernel, inducing_variable, num_data, num_latent_gps, mean_function=None, name=None):
+    """Variational GP layer for Deep GPs using whitened parameterization.
+
+    Each layer maintains its own set of inducing variables and variational
+    parameters (q_mu, q_sqrt).  The whitened parameterization (whiten=True)
+    is used for better numerical conditioning, matching the original gpflux
+    GPLayer default.
+
+    Args:
+        kernel: GPflow kernel for this layer.
+        inducing_variable: GPflow inducing variable (locations Z).
+        num_data: Total number of training data points (used for KL scaling).
+        num_latent_gps: Number of latent GP outputs for this layer.
+        mean_function: Optional mean function.  Defaults to Zero.
+        name: Optional name for this module.
+    """
+
+    def __init__(
+        self,
+        kernel: gpflow.kernels.Kernel,
+        inducing_variable: gpflow.inducing_variables.InducingPoints,
+        num_data: int,
+        num_latent_gps: int,
+        mean_function: gpflow.mean_functions.MeanFunction | None = None,
+        name: str | None = None,
+    ) -> None:
         super().__init__(name=name)
         self.num_latent_gps = num_latent_gps
         self.kernel = kernel
         self.inducing_variable = inducing_variable
-        self.mean_function = mean_function if mean_function is not None else gpflow.mean_functions.Zero()
+        self.mean_function = (
+            mean_function
+            if mean_function is not None
+            else gpflow.mean_functions.Zero()
+        )
         self.num_data = tf.cast(num_data, gpflow.default_float())
 
         num_inducing = self.inducing_variable.num_inducing
-        self.q_mu = tf.Variable(np.zeros((num_inducing, self.num_latent_gps)), dtype=gpflow.default_float(), name="q_mu")
-        
-        q_sqrt_init = np.array([np.eye(num_inducing) for _ in range(self.num_latent_gps)], dtype=gpflow.default_float())
-        self.q_sqrt = gpflow.Parameter(q_sqrt_init, transform=gpflow.utilities.triangular())
-
-    def prior_kl(self):
-        return gpflow.kullback_leiblers.prior_kl(
-            self.inducing_variable, self.kernel, self.q_mu, self.q_sqrt, whiten=False
+        self.q_mu = tf.Variable(
+            np.zeros((num_inducing, self.num_latent_gps)),
+            dtype=gpflow.default_float(),
+            name="q_mu",
         )
 
-    def conditional(self, inputs):
+        q_sqrt_init = np.array(
+            [np.eye(num_inducing) for _ in range(self.num_latent_gps)],
+            dtype=gpflow.default_float(),
+        )
+        self.q_sqrt = gpflow.Parameter(
+            q_sqrt_init, transform=gpflow.utilities.triangular()
+        )
+
+    def prior_kl(self) -> tf.Tensor:
+        """KL divergence KL[q(u) || p(u)] using whitened parameterization."""
+        return gpflow.kullback_leiblers.prior_kl(
+            self.inducing_variable,
+            self.kernel,
+            self.q_mu,
+            self.q_sqrt,
+            whiten=True,
+        )
+
+    def conditional(
+        self, inputs: TensorType
+    ) -> tuple[TensorType, TensorType]:
+        """Compute the conditional mean and variance at *inputs*."""
         f_mean, f_var = gpflow.conditionals.conditional(
             inputs,
             self.inducing_variable,
             self.kernel,
             self.q_mu,
             q_sqrt=self.q_sqrt,
-            white=False,
+            white=True,
             full_cov=False,
-            full_output_cov=False
+            full_output_cov=False,
         )
         if self.mean_function is not None:
             f_mean += self.mean_function(inputs)
         return f_mean, f_var
 
-    def __call__(self, inputs, training=None):
+    def __call__(
+        self,
+        inputs: TensorType | tfd.Distribution,
+        training: bool | None = None,
+    ) -> tfd.Normal:
+        """Forward pass: returns a Normal distribution over outputs.
+
+        If *inputs* is a ``tfd.Distribution`` (from a preceding layer), a
+        single reparameterized sample is drawn first.
+        """
         if isinstance(inputs, tfd.Distribution):
             samples = inputs.sample()
         else:
             samples = inputs
-            
+
         samples = tf.cast(samples, gpflow.default_float())
         f_mean, f_var = self.conditional(samples)
         return tfd.Normal(loc=f_mean, scale=tf.sqrt(f_var))
 
+
 class NativeDeepGP(tf.keras.Model):
-    """A Keras model wrapper for a sequence of GPLayers and a Gaussian Likelihood."""
-    def __init__(self, gp_layers, likelihood, **kwargs):
+    """Keras model wrapping a stack of :class:`GPLayer` and a likelihood.
+
+    The training objective is the evidence lower bound (ELBO):
+
+        ELBO = E_q[log p(y|f)] - KL[q(u) || p(u)]
+
+    The data term uses ``variational_expectations`` (not
+    ``predict_log_density``) so that the bound is valid by Jensen's
+    inequality.  Both terms are averaged per data point for consistent
+    scaling across batch sizes.
+    """
+
+    def __init__(
+        self,
+        gp_layers: list[GPLayer],
+        likelihood: gpflow.likelihoods.Likelihood,
+        **kwargs: t.Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.gp_layers_list = gp_layers
         self.likelihood = likelihood
 
     @property
-    def trainable_variables(self):
-        vars = []
-        for l in self.gp_layers_list:
-            vars.extend(l.trainable_variables)
-        vars.extend(self.likelihood.trainable_variables)
-        return list({v.ref(): v for v in vars}.values())
+    def trainable_variables(self) -> list[tf.Variable]:  # type: ignore[override]
+        all_vars: list[tf.Variable] = []
+        for layer in self.gp_layers_list:
+            all_vars.extend(layer.trainable_variables)
+        all_vars.extend(self.likelihood.trainable_variables)
+        return list({v.ref(): v for v in all_vars}.values())
 
-    def call(self, inputs, training=None):
-        x = inputs
+    def call(
+        self, inputs: TensorType, training: bool | None = None
+    ) -> tfd.Normal:
+        x: TensorType | tfd.Distribution = inputs
         for layer in self.gp_layers_list:
             x = layer(x, training=training)
-        return x
+        return x  # type: ignore[return-value]
 
-    def train_step(self, data):
+    # --------------------------------------------------------------------- #
+    #  Helpers for unpacking the various data formats Keras may pass us.     #
+    # --------------------------------------------------------------------- #
+
+    @staticmethod
+    def _unpack_data(
+        data: t.Any,
+    ) -> tuple[tf.Tensor, tf.Tensor]:
         if isinstance(data, dict):
             x = data["inputs"]
             y = data["targets"]
@@ -89,23 +179,56 @@ class NativeDeepGP(tf.keras.Model):
             x = data
             y = data
 
-        x = tf.cast(x, gpflow.default_float())
-        y = tf.cast(y, gpflow.default_float())
+        return (
+            tf.cast(x, gpflow.default_float()),
+            tf.cast(y, gpflow.default_float()),
+        )
+
+    def _compute_elbo(
+        self, x: tf.Tensor, y: tf.Tensor, training: bool
+    ) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Return ``(loss, ell, kl)`` for a batch."""
+        f_dist = self(x, training=training)
+        f_mean = f_dist.mean()
+        f_var = f_dist.variance()
+
+        # E_q[log p(y|f)] — correct variational expectation (ELBO data term)
+        ell = tf.reduce_mean(
+            self.likelihood.variational_expectations(x, f_mean, f_var, y)
+        )
+
+        # KL[q(u) || p(u)] / N  for each layer
+        kl_loss = tf.reduce_sum(
+            [
+                layer.prior_kl() / layer.num_data
+                for layer in self.gp_layers_list
+            ]
+        )
+
+        loss = -ell + kl_loss
+        return loss, ell, kl_loss
+
+    def train_step(self, data: t.Any) -> dict[str, tf.Tensor]:
+        x, y = self._unpack_data(data)
 
         with tf.GradientTape() as tape:
-            f_dist = self(x, training=True)
-            f_mean = f_dist.mean()
-            f_var = f_dist.variance()
-            
-            ell = tf.reduce_sum(self.likelihood.predict_log_density(x, f_mean, f_var, y))
-            
-            kl_loss = tf.reduce_sum([l.prior_kl() / l.num_data for l in self.gp_layers_list])
-            
-            loss = -ell + kl_loss
+            loss, ell, kl_loss = self._compute_elbo(x, y, training=True)
 
-        grads = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        trainable_vars = self.trainable_variables
+        grads = tape.gradient(loss, trainable_vars)
+        self.optimizer.apply_gradients(zip(grads, trainable_vars))
         return {"loss": loss, "ell": ell, "kl": kl_loss}
+
+    def test_step(self, data: t.Any) -> dict[str, tf.Tensor]:
+        x, y = self._unpack_data(data)
+        loss, ell, kl_loss = self._compute_elbo(x, y, training=False)
+        return {"loss": loss, "ell": ell, "kl": kl_loss}
+
+
+# ------------------------------------------------------------------ #
+#  Factory helpers                                                    #
+# ------------------------------------------------------------------ #
+
 
 def create_two_layer_GPAM_from_data(
     input_data: npt.NDArray[np.float64],
@@ -113,23 +236,29 @@ def create_two_layer_GPAM_from_data(
     return_layers: bool = False,
     n_latent: int = 2,
 ) -> t.Any:
-    """Generator function to create 2 layer GP given a dataset and its dimensions etc.
+    """Create a 2-layer Deep GP from an existing dataset.
 
     Args:
-        input_data (ndarray): dataset to be used to train model - this is where we get parameters off of.
-        num_inducing (int, optional): Number of inducing points to use. Defaults to 50.
-        return_layers (bool, optional): Set to true if individual layers are to be returned alongside model. Defaults to False.
-        n_latent (int, optional): Dimension of latent space. Defaults to 2.
+        input_data: Dataset array of shape ``(N, D)``.
+        num_inducing: Number of inducing points.  Clamped to at most ``N``
+            to prevent duplicate selections.  Defaults to 50.
+        return_layers: If ``True``, also return the individual GP layers.
+        n_latent: Dimension of the latent space.  Defaults to 2.
 
     Returns:
-        model (NativeDeepGP): final model object.
+        A compiled :class:`NativeDeepGP` model, or
+        ``(model, gp_layer1, gp_layer2)`` when *return_layers* is ``True``.
     """
-
     num_data = input_data.shape[0]
+    num_inducing = min(num_inducing, num_data)
 
-    Z = input_data[np.random.choice(input_data.shape[0], size=num_inducing)]
-    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * input_data.shape[1])
-    inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
+    z_indices = np.random.choice(num_data, size=num_inducing, replace=False)
+    inducing_z = input_data[z_indices].copy()
+
+    kernel1 = gpflow.kernels.SquaredExponential(
+        lengthscales=[1] * input_data.shape[1]
+    )
+    inducing_variable1 = gpflow.inducing_variables.InducingPoints(inducing_z)
     gp_layer1 = GPLayer(
         kernel1,
         inducing_variable1,
@@ -156,8 +285,8 @@ def create_two_layer_GPAM_from_data(
 
     if return_layers:
         return model, gp_layer1, gp_layer2
-    else:
-        return model
+    return model
+
 
 def create_two_layer_GPAM_from_scratch(
     num_input: int,
@@ -167,22 +296,22 @@ def create_two_layer_GPAM_from_scratch(
     return_layers: bool = False,
     n_latent: int = 2,
 ) -> t.Any:
-    """Generator function to create two layer GPAM model natively.
+    """Create a 2-layer Deep GP from scratch (without existing data).
+
     Args:
-        num_input (int): Number of input dimensions.
-        num_data (int, optional): Number of data points used for training, important to calculate loss properly. Defaults to 1.
-        Z (ndarray, optional): Array of inducing locations. Defaults to None - will be generated at random.
-        num_inducing (int, optional): Number of inducing points. Defaults to 50.
-        return_layers (bool, optional): Set to true if individual layers are to be returned alongside model. Defaults to False.
-        n_latent (int, optional): Dimension of latent space. Defaults to 2.
+        num_input: Number of input dimensions.
+        num_data: Number of training data points (used for ELBO scaling).
+        Z: Optional array of inducing-point locations.  Generated at random
+            if ``None``.
+        num_inducing: Number of inducing points.  Defaults to 50.
+        return_layers: If ``True``, also return the individual GP layers.
+        n_latent: Dimension of the latent space.  Defaults to 2.
 
     Returns:
-        model (NativeDeepGP): final model object.
+        A compiled :class:`NativeDeepGP` model, or
+        ``(model, gp_layer1, gp_layer2)`` when *return_layers* is ``True``.
     """
-
-    if Z is not None:
-        pass
-    else:
+    if Z is None:
         Z = np.random.rand(num_inducing, num_input)
 
     kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * num_input)
@@ -213,27 +342,29 @@ def create_two_layer_GPAM_from_scratch(
 
     if return_layers:
         return model, gp_layer1, gp_layer2
-    else:
-        return model
+    return model
+
 
 def model_inference(
-    data: npt.NDArray[np.float64], encoder: t.Any, batch_size: int = 20000
+    data: npt.NDArray[np.float64],
+    encoder: t.Any,
+    batch_size: int = 20000,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """Utility function for batched model inference to reduce memory usage.
+    """Batched model inference to reduce memory usage.
 
     Args:
-        data (ndarray): Data to be used for inference.
-        encoder (model layer): Encoding layer(s) from GPAM model to use for inference.
-        batch_size (int, optional): Size of batch to use - this depends on memory to be used. Defaults to 20000.
+        data: Data array of shape ``(N, D)``.
+        encoder: A :class:`GPLayer` (or callable returning a ``tfd.Distribution``).
+        batch_size: Batch size for inference.  Defaults to 20000.
 
     Returns:
-        latents (tuple of 2 ndarrays): Mean and variance of latent distributions for every data point.
+        ``(means, variances)`` — each of shape ``(N, L)``.
     """
     import tqdm
 
     max_iter = len(data) / batch_size
     means = []
-    vars = []
+    variances = []
     for i in tqdm.tqdm(range(int(max_iter) + 1)):
         if max_iter - i < 0:
             res = encoder(data[batch_size * i :])
@@ -241,7 +372,6 @@ def model_inference(
             res = encoder(data[batch_size * i : batch_size * (i + 1)])
 
         means.append(res.mean())
-        vars.append(res.variance())
+        variances.append(res.variance())
 
-    return np.concatenate(means, axis=0), np.concatenate(vars, axis=0)
-
+    return np.concatenate(means, axis=0), np.concatenate(variances, axis=0)
