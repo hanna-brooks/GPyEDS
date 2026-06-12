@@ -3,14 +3,18 @@
 """
 
 import time
+import typing as t
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import skimage.filters as filters
 
 
-def remove_pc_comp(conc_map, comp2remove):
+def remove_pc_comp(
+    conc_map: npt.NDArray[np.float64], comp2remove: int
+) -> npt.NDArray[np.float64]:
     from sklearn.decomposition import PCA
 
     dummy_mask = np.ones((conc_map.shape[0], conc_map.shape[1]), dtype="bool")
@@ -31,7 +35,7 @@ def remove_pc_comp(conc_map, comp2remove):
     return conc_map
 
 
-def split_at(string, char, n):
+def split_at(string: str, char: str, n: int) -> tuple[str, str]:
     """
     Splits string into two at the nth occurence of the character specified.
 
@@ -49,7 +53,7 @@ def split_at(string, char, n):
     return char.join(words[:n]), char.join(words[n:])
 
 
-def get_img(values, mask):
+def get_img(values: t.Any, mask: t.Any) -> t.Any:
     """
     Function to transform cluster or decomposition results into a displayable image.
     It adds 'nan' to all pixels where no data exists.
@@ -75,7 +79,7 @@ def get_img(values, mask):
     return new_array
 
 
-def list2stack(array_list):
+def list2stack(array_list: list[t.Any]) -> npt.NDArray[np.float64]:
     """
     Function to stack lists of 2D numpy arrays to a 3D stack.
 
@@ -111,7 +115,7 @@ def list2stack(array_list):
     return stack
 
 
-def stack2list(stack):
+def stack2list(stack: npt.NDArray[np.float64]) -> list[t.Any]:
     """
     Opposite/reverse of list2stack function.
 
@@ -137,7 +141,9 @@ def stack2list(stack):
     return array_list
 
 
-def gauss_check(item):
+def gauss_check(
+    item: npt.NDArray[np.float64] | list[npt.NDArray[np.float64]],
+) -> list[npt.NDArray[np.float64]]:
     """
     Checks input parameters of Gaussian filter function for appropriate
     types. Allows for the handling of multipl types of parameters eg. lists
@@ -158,19 +164,24 @@ def gauss_check(item):
     if isinstance(item, list) == True:
         item_list = item
     elif isinstance(item, np.ndarray) == True:
-        if len(item.shape) == 3:
-            item_list = stack2list(item)
-        elif len(item.shape) == 2:
-            item_list = [item]
+        if len(item.shape) == 3:  # type: ignore
+            item_list = stack2list(item)  # type: ignore
+        elif len(item.shape) == 2:  # type: ignore
+            item_list = [item]  # type: ignore
         else:
             raise ValueError("Stack object passed must be 2D or 3D numpy array.")
     else:
         raise ValueError("Concentration map passed must be a list or 2/3D numpy array.")
 
-    return item_list
+    return item_list  # type: ignore
 
 
-def gaussian_filter(conc, mask, std=5, list_return=False):
+def gaussian_filter(
+    conc: t.Any,
+    mask: t.Any,
+    std: int = 5,
+    list_return: bool = False,
+) -> t.Any:
     """
     Wrapper for the skimage implementation of the Gaussian filter function.
     This implementation takes into account the different phases present and limits
@@ -209,10 +220,10 @@ def gaussian_filter(conc, mask, std=5, list_return=False):
     filtered_maps = []
 
     for i in range(len(conc_list)):
-        gauss_conc = filters.gaussian(
+        gauss_conc = filters.gaussian(  # type: ignore
             np.multiply(conc_list[i], mask_list[i]), std, truncate=10
         )
-        gauss_mask = filters.gaussian(mask_list[i], std, truncate=10)
+        gauss_mask = filters.gaussian(mask_list[i], std, truncate=10)  # type: ignore
 
         gauss_conc = gauss_conc[mask_list[i].astype("bool")]
         gauss_mask = gauss_mask[mask_list[i].astype("bool")]
@@ -226,7 +237,11 @@ def gaussian_filter(conc, mask, std=5, list_return=False):
         return list2stack(filtered_maps)
 
 
-def feature_normalisation(feature, return_params=False, mean_norm=True):
+def feature_normalisation(
+    feature: npt.NDArray[np.float64],
+    return_params: bool = False,
+    mean_norm: bool = True,
+) -> t.Any:
     """
     Function to perform mean normalisation on the dataset passed to it.
 
@@ -283,7 +298,11 @@ def feature_normalisation(feature, return_params=False, mean_norm=True):
         return norm
 
 
-def get_masks(label_array, values=None, return_list=False):
+def get_masks(
+    label_array: npt.NDArray[np.int_],
+    values: t.Any = None,
+    return_list: bool = False,
+) -> t.Any:
     """
     Creates a list of masks from a label array passed to it.
 
@@ -330,9 +349,9 @@ def get_masks(label_array, values=None, return_list=False):
 
 
 def build_conc_map(
-    data,
-    shape=None,
-):
+    data: pd.DataFrame,
+    shape: list[int] | None = None,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Build 3D numpy conc_map from pandas dataframe.
 
@@ -368,7 +387,7 @@ def build_conc_map(
 
     conc_map = np.zeros(shape)
     conc_map.fill(np.nan)
-    data_mask = np.zeros((shape[0], shape[1]))
+    data_mask: t.Any = np.zeros((shape[0], shape[1]))
     k = 1
     length = len(data)
 
@@ -390,8 +409,14 @@ def build_conc_map(
 
 
 def plot_decomp(
-    scores, comps, plot_return=False, elements=None, mask=None, smooth=None, ex_var=None
-):
+    scores: npt.NDArray[np.float64],
+    comps: npt.NDArray[np.float64],
+    plot_return: bool = False,
+    elements: list[str] | None = None,
+    mask: npt.NDArray[np.bool_] | None = None,
+    smooth: int | None = None,
+    ex_var: npt.NDArray[np.float64] | None = None,
+) -> tuple[t.Any, t.Any] | None:
     """
     Function to plot the results of the decomposition function. It may be called directly or
     through the clustering function itself.
@@ -435,7 +460,7 @@ def plot_decomp(
         # diff = vmax - vmin
         # vmin += 0.25*diff
         # vmax -= 0.25*diff
-        vmin, vmax = np.percentile(scores[:, :, i][mask.astype("bool")], [75, 25])
+        vmin, vmax = np.percentile(scores[:, :, i][mask.astype("bool")], [75, 25])  # type: ignore
         # print(scores[:,:,i].shape)
         if smooth is not None:
             img = ax[i][0].imshow(
@@ -449,8 +474,8 @@ def plot_decomp(
                 scores[:, :, i], interpolation="none", vmin=vmin, vmax=vmax
             )
         fig.colorbar(img, ax=ax[i][0], fraction=0.02, pad=0.03)
-        ax[i][1].bar(range(len(elements)), comps[i], width=0.5, tick_label=elements)
-        ax[i][1].plot([-0.5, len(elements) - 0.5], [0, 0], "k-")
+        ax[i][1].bar(range(len(elements)), comps[i], width=0.5, tick_label=elements)  # type: ignore
+        ax[i][1].plot([-0.5, len(elements) - 0.5], [0, 0], "k-")  # type: ignore
         if ex_var is not None:
             ax[i][1].set_title(
                 "Explained Variance Ratio: " + str(np.round(ex_var[i], 4))
@@ -547,17 +572,17 @@ def plot_decomp(
 
 
 def decompose(
-    data,
-    n_components=2,
-    method="pca",
-    tol=0.05,
-    plot=False,
-    plot_return=False,
-    elements=None,
-    data_mask=None,
-    df_shape=None,
-    smooth=None,
-):
+    data: pd.DataFrame | npt.NDArray[np.float64],
+    n_components: int = 2,
+    method: str = "pca",
+    tol: float = 0.05,
+    plot: bool = False,
+    plot_return: bool = False,
+    elements: list[str] | None = None,
+    data_mask: npt.NDArray[np.bool_] | None = None,
+    df_shape: list[int] | None = None,
+    smooth: int | None = None,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]] | tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], t.Any, t.Any]:
     """
     Function to perform the selected decomposition algorithm on the data passed. Ideal for use in
     the initial data exploration steps.
@@ -585,12 +610,12 @@ def decompose(
     from sklearn import decomposition
 
     if isinstance(data, pd.DataFrame):
-        data, data_mask = build_conc_map(data, df_shape)
+        data, data_mask = build_conc_map(data, df_shape)  # type: ignore
     else:
         pass
 
     if len(data.shape) == 3:
-        array = data[data_mask.astype("bool")]
+        array = data[data_mask.astype("bool")]  # type: ignore
     elif len(data.shape) == 2:
         # assume it's in the right form
         array = data
@@ -600,9 +625,9 @@ def decompose(
         )
 
     if data_mask is None:
-        data_mask = np.ones((data.shape[0], 1))
+        data_mask = np.ones((data.shape[0], 1))  # type: ignore
     if elements is None:
-        elements = [i for i in range(data.shape[-1])]
+        elements = [str(i) for i in range(data.shape[-1])]
 
     start = time.time()
 
@@ -634,12 +659,12 @@ def decompose(
     print("Decomposition processing time (s): " + str(process_time))
 
     # components = rescale(components, params)
-    scores_2d = np.zeros((data_mask.shape[0], data_mask.shape[1], n_components))
+    scores_2d = np.zeros((data_mask.shape[0], data_mask.shape[1], n_components))  # type: ignore
     for i in range(n_components):
         scores_2d[:, :, i] = get_img(scores[:, i], data_mask)
 
     if plot == True:
-        fig, ax = plot_decomp(
+        fig, ax = plot_decomp(  # type: ignore
             scores_2d,
             components,
             plot_return=True,

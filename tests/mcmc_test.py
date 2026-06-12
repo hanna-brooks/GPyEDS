@@ -3,7 +3,7 @@ import numpy as np
 from GPyEDS.EDS2CHEM import mcmc
 
 
-def test_draw():
+def test_draw() -> None:
     img = np.zeros((100, 100))
 
     new = mcmc.draw_line(img, 10, 10, 50, 50)
@@ -11,7 +11,7 @@ def test_draw():
     new2 = mcmc.draw_proj_box(img, 10, 10, 50, 50, pstep=5)
 
 
-def test_simple_mcmc_run():
+def test_simple_mcmc_run() -> None:
     dummy = np.random.rand(20)
 
     y = np.random.rand(20)
@@ -23,7 +23,7 @@ def test_simple_mcmc_run():
     mcmc.Simple_MCMC_run(dummy, y, y * 0.01, params, pmin, pmax, num_iter=10)
 
 
-def test_full_mcmc_run():
+def test_full_mcmc_run() -> None:
     dummy_map = np.random.rand(100, 100)
 
     y = np.random.rand(20)
@@ -35,7 +35,7 @@ def test_full_mcmc_run():
     mcmc.MCMC_run(dummy_map, y, y * 0.01, params, pmin, pmax, num_iter=10)
 
 
-def test_align_once():
+def test_align_once() -> None:
     dummy_map = np.random.rand(100, 100)
 
     pos = np.linspace(1, 5, 5).astype("int64")

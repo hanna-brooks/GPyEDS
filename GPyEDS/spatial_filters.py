@@ -1,21 +1,32 @@
+import typing as t
+
 import numpy as np
-import scipy
+import numpy.typing as npt
+import scipy.signal
 
 
-def gkern(l=5, sig=1.0):
+def gkern(l: int = 5, sig: float = 1.0) -> npt.NDArray[np.float64]:
     """
     creates gaussian kernel with side length `l` and a sigma of `sig`
     """
     ax = np.linspace(-(l - 1) / 2.0, (l - 1) / 2.0, l)
     gauss = np.exp(-0.5 * np.square(ax) / np.square(sig))
     kernel = np.outer(gauss, gauss)
-    return kernel / np.sum(kernel)
+    return kernel / np.sum(kernel)  # type: ignore
 
 
-def linear_filter(map, mask, range_, type="mean", sigma=None):
+def linear_filter(
+    map: npt.NDArray[np.float64],
+    mask: npt.NDArray[np.bool_],
+    range_: int,
+    type: str = "mean",
+    sigma: float | None = None,
+) -> npt.NDArray[np.float64]:
     if type == "mean":
         n = (2 * range_ + 1) ** 2
-        filter = [[1 / n for _ in range(2 * range_ + 1)] for k in range(2 * range_ + 1)]
+        filter: t.Any = [
+            [1 / n for _ in range(2 * range_ + 1)] for k in range(2 * range_ + 1)
+        ]
 
     elif type == "gaussian":
         n = 2 * range_ + 1
@@ -40,7 +51,9 @@ def linear_filter(map, mask, range_, type="mean", sigma=None):
     return r[range_:-range_, range_:-range_]
 
 
-def median_filter(map, mask, range_):
+def median_filter(
+    map: npt.NDArray[np.float64], mask: npt.NDArray[np.bool_], range_: int
+) -> npt.NDArray[np.float64]:
     pmap = np.pad(map, (range_, range_), mode="constant")
     pmask = np.pad(mask, (range_, range_), mode="constant")
 

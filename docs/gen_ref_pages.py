@@ -1,9 +1,10 @@
 """Generate the code reference pages and navigation."""
 
 from pathlib import Path
+
 import mkdocs_gen_files
 
-nav = mkdocs_gen_files.Nav()
+nav = mkdocs_gen_files.Nav()  # type: ignore
 
 root = Path(__file__).parent.parent
 src = root / "GPyEDS"
@@ -50,9 +51,8 @@ with mkdocs_gen_files.open("cite.md", "w") as f:
     f.write(cite_content)
 
 # Generate licence.md from root LICENSE
-with open(root / "LICENSE", "r") as f:
+with open(root / "LICENSE") as f:
     license_content = f.read()
 
 with mkdocs_gen_files.open("licence.md", "w") as f:
     f.write(license_content)
-

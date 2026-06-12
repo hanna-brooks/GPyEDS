@@ -1,9 +1,19 @@
-# %%
+import typing as t
+
 import numpy as np
+import numpy.typing as npt
 import scipy.interpolate as interpolate
 
 
-def draw_line(img, x0, y0, x1, y1, value=1, pstep=None):
+def draw_line(
+    img: npt.NDArray[np.float64],
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    value: int = 1,
+    pstep: int | None = None,
+) -> t.Any:
     """_summary_
 
     Args:
@@ -31,14 +41,23 @@ def draw_line(img, x0, y0, x1, y1, value=1, pstep=None):
         p.append([int(round(x1 * t + x0 * (1 - t))), int(round(y1 * t + y0 * (1 - t)))])
         t += step_size
 
-    p = np.asarray(p)
-    mat[p[:, 0], p[:, 1]] = value
+    p = np.asarray(p)  # type: ignore
+    mat[p[:, 0], p[:, 1]] = value  # type: ignore
 
     print(p)
     return img[mat.astype("bool")]
 
 
-def draw_proj_box(img, x0, y0, x1, y1, phi=45, value=1, pstep=1):
+def draw_proj_box(
+    img: npt.NDArray[np.float64],
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    phi: float = 45,
+    value: int = 1,
+    pstep: int = 1,
+) -> t.Any:
     """_summary_
 
     Args:
@@ -96,7 +115,11 @@ def draw_proj_box(img, x0, y0, x1, y1, phi=45, value=1, pstep=1):
     return np.asarray(conc)
 
 
-def align_once(inputmatrix, pos, theta):
+def align_once(
+    inputmatrix: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    theta: list[float],
+) -> t.Any:
     """_summary_
 
     Args:
@@ -137,7 +160,12 @@ def align_once(inputmatrix, pos, theta):
     return trial_x
 
 
-def align(inputmatrix, theta, pos, **kwargs):
+def align(
+    inputmatrix: npt.NDArray[np.float64],
+    theta: list[float],
+    pos: npt.NDArray[np.float64],
+    **kwargs: t.Any,
+) -> t.Any:
     """_summary_
 
     Args:
@@ -181,12 +209,12 @@ def align(inputmatrix, theta, pos, **kwargs):
 
 
 class logfuncs:
-    def __init__(self, pmin, pmax):
+    def __init__(self, pmin: list[float], pmax: list[float]) -> None:
         # super().__init___(pmin, pmax)
         self.pmin = pmin
         self.pmax = pmax
 
-    def log_prior(self, theta):
+    def log_prior(self, theta: list[float]) -> t.Any:
         """_summary_
 
         Args:
@@ -209,7 +237,14 @@ class logfuncs:
             return 0.0
         return -np.inf
 
-    def log_likelihood(self, theta, x, y, yerr, pos):
+    def log_likelihood(
+        self,
+        theta: list[float],
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        yerr: npt.NDArray[np.float64],
+        pos: npt.NDArray[np.float64],
+    ) -> t.Any:
         """_summary_
 
         Args:
@@ -231,7 +266,14 @@ class logfuncs:
         # sigma2 = model**2
         return -0.5 * np.sum(np.divide((y - model) ** 2, yerr**2))
 
-    def log_probability(self, theta, x, y, yerr, pos):
+    def log_probability(
+        self,
+        theta: list[float],
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        yerr: npt.NDArray[np.float64],
+        pos: npt.NDArray[np.float64],
+    ) -> t.Any:
         """_summary_
 
         Args:
@@ -251,12 +293,12 @@ class logfuncs:
 
 
 class simple_logfuncs:
-    def __init__(self, pmin, pmax):
+    def __init__(self, pmin: list[float], pmax: list[float]) -> None:
         # super().__init___(pmin, pmax)
         self.pmin = pmin
         self.pmax = pmax
 
-    def log_prior(self, theta):
+    def log_prior(self, theta: list[float]) -> t.Any:
         """_summary_
 
         Args:
@@ -270,7 +312,13 @@ class simple_logfuncs:
             return 0.0
         return -np.inf
 
-    def log_likelihood(self, theta, x, y, yerr):
+    def log_likelihood(
+        self,
+        theta: list[float],
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        yerr: npt.NDArray[np.float64],
+    ) -> t.Any:
         """_summary_
 
         Args:
@@ -290,7 +338,13 @@ class simple_logfuncs:
         # sigma2 = model**2
         return -0.5 * np.sum(np.divide((y - model) ** 2, yerr**2))
 
-    def log_probability(self, theta, x, y, yerr):
+    def log_probability(
+        self,
+        theta: list[float],
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        yerr: npt.NDArray[np.float64],
+    ) -> t.Any:
         """_summary_
 
         Args:
@@ -308,18 +362,18 @@ class simple_logfuncs:
         return lp + self.log_likelihood(theta, x, y, yerr)
 
 
-def MCMC_run(
-    x,
-    y,
-    uncert,
-    params,
-    pmin,
-    pmax,
-    positions=None,
-    num_iter=10000,
-    return_=False,
-    name="mcmc",
-):
+def MCMC_run(  # type: ignore
+    x: npt.NDArray[np.float64],
+    y: npt.NDArray[np.float64],
+    uncert: npt.NDArray[np.float64],
+    params: list[float],
+    pmin: list[float],
+    pmax: list[float],
+    positions: npt.NDArray[np.float64] | None = None,
+    num_iter: int = 10000,
+    return_: bool = False,
+    name: str = "mcmc",
+) -> t.Any | None:
     """_summary_
 
     Args:
@@ -382,9 +436,17 @@ def MCMC_run(
         return sampler
 
 
-def Simple_MCMC_run(
-    x, y, uncert, params, pmin, pmax, num_iter=1e4, return_=False, name="mcmc"
-):
+def Simple_MCMC_run(  # type: ignore
+    x: npt.NDArray[np.float64],
+    y: npt.NDArray[np.float64],
+    uncert: npt.NDArray[np.float64],
+    params: list[float],
+    pmin: list[float],
+    pmax: list[float],
+    num_iter: int = 10000,
+    return_: bool = False,
+    name: str = "mcmc",
+) -> t.Any | None:
     """_summary_
 
     Args:

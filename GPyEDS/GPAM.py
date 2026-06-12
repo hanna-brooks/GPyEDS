@@ -1,12 +1,18 @@
+import typing as t
+
 import gpflow
 import gpflux
 import numpy as np
+import numpy.typing as npt
 import tensorflow as tf
 
 
 def create_two_layer_GPAM_from_data(
-    input_data, num_inducing=50, return_layers=False, n_latent=2
-):
+    input_data: npt.NDArray[np.float64],
+    num_inducing: int = 50,
+    return_layers: bool = False,
+    n_latent: int = 2,
+) -> t.Any:
     """Generator function to create 2 layer GP using GPFlux given a dataset and its dimensions etc.
 
     Args:
@@ -24,7 +30,7 @@ def create_two_layer_GPAM_from_data(
     Z = input_data[np.random.choice(input_data.shape[0], size=num_inducing)]
     kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * input_data.shape[1])
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
-    gp_layer1 = gpflux.layers.GPLayer(
+    gp_layer1 = gpflux.layers.GPLayer(  # type: ignore
         kernel1,
         inducing_variable1,
         num_data=num_data,
@@ -36,7 +42,7 @@ def create_two_layer_GPAM_from_data(
     inducing_variable2 = gpflow.inducing_variables.InducingPoints(
         np.random.rand(num_inducing, n_latent)
     )
-    gp_layer2 = gpflux.layers.GPLayer(
+    gp_layer2 = gpflux.layers.GPLayer(  # type: ignore
         kernel2,
         inducing_variable2,
         num_data=num_data,
@@ -44,10 +50,10 @@ def create_two_layer_GPAM_from_data(
         mean_function=gpflow.mean_functions.Zero(),
     )
 
-    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))
-    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)
+    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))  # type: ignore
+    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)  # type: ignore
     model = two_layer_dgp.as_training_model()
-    model.compile(tf.optimizers.Adam(0.01))
+    model.compile("adam")
 
     if return_layers:
         return model, gp_layer1, gp_layer2
@@ -56,8 +62,13 @@ def create_two_layer_GPAM_from_data(
 
 
 def create_two_layer_GPAM_from_scratch(
-    num_input, num_data=1, Z=None, num_inducing=50, return_layers=False, n_latent=2
-):
+    num_input: int,
+    num_data: int = 1,
+    Z: npt.NDArray[np.float64] | None = None,
+    num_inducing: int = 50,
+    return_layers: bool = False,
+    n_latent: int = 2,
+) -> t.Any:
     """Generator function to create two layer GPAM model in GPFlux.
     Args:
         num_input (int): Number of input dimensions.
@@ -78,7 +89,7 @@ def create_two_layer_GPAM_from_scratch(
 
     kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * num_input)
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
-    gp_layer1 = gpflux.layers.GPLayer(
+    gp_layer1 = gpflux.layers.GPLayer(  # type: ignore
         kernel1,
         inducing_variable1,
         num_data=num_data,
@@ -90,7 +101,7 @@ def create_two_layer_GPAM_from_scratch(
     inducing_variable2 = gpflow.inducing_variables.InducingPoints(
         np.random.rand(num_inducing, n_latent)
     )
-    gp_layer2 = gpflux.layers.GPLayer(
+    gp_layer2 = gpflux.layers.GPLayer(  # type: ignore
         kernel2,
         inducing_variable2,
         num_data=num_data,
@@ -98,10 +109,10 @@ def create_two_layer_GPAM_from_scratch(
         mean_function=gpflow.mean_functions.Zero(),
     )
 
-    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))
-    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)
+    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))  # type: ignore
+    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)  # type: ignore
     model = two_layer_dgp.as_training_model()
-    model.compile(tf.optimizers.Adam(0.01))
+    model.compile("adam")
 
     if return_layers:
         return model, gp_layer1, gp_layer2
@@ -109,7 +120,9 @@ def create_two_layer_GPAM_from_scratch(
         return model
 
 
-def model_inference(data, encoder, batch_size=20000):
+def model_inference(
+    data: npt.NDArray[np.float64], encoder: t.Any, batch_size: int = 20000
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """Utility function for batched model inference to reduce memory usage.
 
     Args:

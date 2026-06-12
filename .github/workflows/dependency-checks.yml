@@ -1,0 +1,65 @@
+name: Dependency Checks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# REQUIRED: Grant permission to the GITHUB_TOKEN to write PR comments
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  check-dependencies:
+    name: Deptry & Outdated Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install project dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Initialize PR Comment File
+        # We only want to generate this file if it's a PR
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## 📦 Dependency Check Report" > pr_comment.md
+          echo "" >> pr_comment.md
+
+      - name: Run deptry
+        # Using pipefail ensures the step still fails if deptry finds issues, 
+        # even though we are piping it into tee.
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "### 🔍 Deptry Results" >> pr_comment.md
+            echo '```text' >> pr_comment.md
+            set -o pipefail
+            uv run deptry . 2>&1 | tee -a pr_comment.md
+            echo '```' >> pr_comment.md
+          else
+            uv run deptry .
+          fi
+
+      - name: Post Comment to PR
+        # IMPORTANT: Use if: always() so the comment posts even if deptry fails the build!
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          # The header ensures the action finds and updates its previous comment
+          header: dependency-report
+          path: pr_comment.md
