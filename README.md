@@ -4,7 +4,12 @@ GPyEDS is a Python toolbox for the analysis of Energy Dispersive X-ray Spectrosc
 
 ## Installation
 
-GPyEDS requires Python 3.12. We strongly recommend using [uv](https://github.com/astral-sh/uv) for the fastest installation and environment management.
+GPyEDS requires Python 3.12. 
+
+> [!NOTE]
+> **Python Version Restriction:** We are currently capped at Python 3.12 because `gpflow` inherently requires `tensorflow-macos` on Apple Silicon. Google stopped publishing `tensorflow-macos` after version 2.16 (which maxes out at Python 3.12) since Apple Silicon support was merged directly into the mainline `tensorflow` package in version 2.17. Until `gpflow` drops this legacy requirement, we must stay on Python 3.12 for universal cross-platform compatibility.
+
+We strongly recommend using [uv](https://github.com/astral-sh/uv) for the fastest installation and environment management.
 
 ### Using uv (Recommended)
 

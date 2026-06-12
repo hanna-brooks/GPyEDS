@@ -1,11 +1,111 @@
 import typing as t
 
 import gpflow
-import gpflux
 import numpy as np
 import numpy.typing as npt
 import tensorflow as tf
+import tensorflow_probability as tfp
 
+tfd = tfp.distributions
+
+class GPLayer(gpflow.Module):
+    """Native GPflow implementation of a Variational GP Layer for Deep GPs."""
+    def __init__(self, kernel, inducing_variable, num_data, num_latent_gps, mean_function=None, name=None):
+        super().__init__(name=name)
+        self.num_latent_gps = num_latent_gps
+        self.kernel = kernel
+        self.inducing_variable = inducing_variable
+        self.mean_function = mean_function if mean_function is not None else gpflow.mean_functions.Zero()
+        self.num_data = tf.cast(num_data, gpflow.default_float())
+
+        num_inducing = self.inducing_variable.num_inducing
+        self.q_mu = tf.Variable(np.zeros((num_inducing, self.num_latent_gps)), dtype=gpflow.default_float(), name="q_mu")
+        
+        q_sqrt_init = np.array([np.eye(num_inducing) for _ in range(self.num_latent_gps)], dtype=gpflow.default_float())
+        self.q_sqrt = gpflow.Parameter(q_sqrt_init, transform=gpflow.utilities.triangular())
+
+    def prior_kl(self):
+        return gpflow.kullback_leiblers.prior_kl(
+            self.inducing_variable, self.kernel, self.q_mu, self.q_sqrt, whiten=False
+        )
+
+    def conditional(self, inputs):
+        f_mean, f_var = gpflow.conditionals.conditional(
+            inputs,
+            self.inducing_variable,
+            self.kernel,
+            self.q_mu,
+            q_sqrt=self.q_sqrt,
+            white=False,
+            full_cov=False,
+            full_output_cov=False
+        )
+        if self.mean_function is not None:
+            f_mean += self.mean_function(inputs)
+        return f_mean, f_var
+
+    def __call__(self, inputs, training=None):
+        if isinstance(inputs, tfd.Distribution):
+            samples = inputs.sample()
+        else:
+            samples = inputs
+            
+        samples = tf.cast(samples, gpflow.default_float())
+        f_mean, f_var = self.conditional(samples)
+        return tfd.Normal(loc=f_mean, scale=tf.sqrt(f_var))
+
+class NativeDeepGP(tf.keras.Model):
+    """A Keras model wrapper for a sequence of GPLayers and a Gaussian Likelihood."""
+    def __init__(self, gp_layers, likelihood, **kwargs):
+        super().__init__(**kwargs)
+        self.gp_layers_list = gp_layers
+        self.likelihood = likelihood
+
+    @property
+    def trainable_variables(self):
+        vars = []
+        for l in self.gp_layers_list:
+            vars.extend(l.trainable_variables)
+        vars.extend(self.likelihood.trainable_variables)
+        return list({v.ref(): v for v in vars}.values())
+
+    def call(self, inputs, training=None):
+        x = inputs
+        for layer in self.gp_layers_list:
+            x = layer(x, training=training)
+        return x
+
+    def train_step(self, data):
+        if isinstance(data, dict):
+            x = data["inputs"]
+            y = data["targets"]
+        elif isinstance(data, tuple):
+            if len(data) == 2:
+                x, y = data
+            else:
+                x = data[0]
+                y = data[0]
+        else:
+            x = data
+            y = data
+
+        x = tf.cast(x, gpflow.default_float())
+        y = tf.cast(y, gpflow.default_float())
+
+        with tf.GradientTape() as tape:
+            f_dist = self(x, training=True)
+            f_mean = f_dist.mean()
+            f_var = f_dist.variance()
+            
+            ell = tf.reduce_sum(self.likelihood.predict_log_density(x, f_mean, f_var, y))
+            
+            kl_loss = tf.reduce_sum([l.prior_kl() / l.num_data for l in self.gp_layers_list])
+            
+            loss = -ell + kl_loss
+
+        grads = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        return {"loss": loss, "ell": ell, "kl": kl_loss}
 
 def create_two_layer_GPAM_from_data(
     input_data: npt.NDArray[np.float64],
@@ -13,7 +113,7 @@ def create_two_layer_GPAM_from_data(
     return_layers: bool = False,
     n_latent: int = 2,
 ) -> t.Any:
-    """Generator function to create 2 layer GP using GPFlux given a dataset and its dimensions etc.
+    """Generator function to create 2 layer GP given a dataset and its dimensions etc.
 
     Args:
         input_data (ndarray): dataset to be used to train model - this is where we get parameters off of.
@@ -22,7 +122,7 @@ def create_two_layer_GPAM_from_data(
         n_latent (int, optional): Dimension of latent space. Defaults to 2.
 
     Returns:
-        model (gpflux model): final model object.
+        model (NativeDeepGP): final model object.
     """
 
     num_data = input_data.shape[0]
@@ -30,7 +130,7 @@ def create_two_layer_GPAM_from_data(
     Z = input_data[np.random.choice(input_data.shape[0], size=num_inducing)]
     kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * input_data.shape[1])
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
-    gp_layer1 = gpflux.layers.GPLayer(  # type: ignore
+    gp_layer1 = GPLayer(
         kernel1,
         inducing_variable1,
         num_data=num_data,
@@ -42,7 +142,7 @@ def create_two_layer_GPAM_from_data(
     inducing_variable2 = gpflow.inducing_variables.InducingPoints(
         np.random.rand(num_inducing, n_latent)
     )
-    gp_layer2 = gpflux.layers.GPLayer(  # type: ignore
+    gp_layer2 = GPLayer(
         kernel2,
         inducing_variable2,
         num_data=num_data,
@@ -50,16 +150,14 @@ def create_two_layer_GPAM_from_data(
         mean_function=gpflow.mean_functions.Zero(),
     )
 
-    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))  # type: ignore
-    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)  # type: ignore
-    model = two_layer_dgp.as_training_model()
-    model.compile("adam")
+    likelihood_layer = gpflow.likelihoods.Gaussian(0.1)
+    model = NativeDeepGP([gp_layer1, gp_layer2], likelihood_layer)
+    model.compile(optimizer="adam")
 
     if return_layers:
         return model, gp_layer1, gp_layer2
     else:
         return model
-
 
 def create_two_layer_GPAM_from_scratch(
     num_input: int,
@@ -69,7 +167,7 @@ def create_two_layer_GPAM_from_scratch(
     return_layers: bool = False,
     n_latent: int = 2,
 ) -> t.Any:
-    """Generator function to create two layer GPAM model in GPFlux.
+    """Generator function to create two layer GPAM model natively.
     Args:
         num_input (int): Number of input dimensions.
         num_data (int, optional): Number of data points used for training, important to calculate loss properly. Defaults to 1.
@@ -79,7 +177,7 @@ def create_two_layer_GPAM_from_scratch(
         n_latent (int, optional): Dimension of latent space. Defaults to 2.
 
     Returns:
-        model (gpflux model): final model object.
+        model (NativeDeepGP): final model object.
     """
 
     if Z is not None:
@@ -89,7 +187,7 @@ def create_two_layer_GPAM_from_scratch(
 
     kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * num_input)
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(Z.copy())
-    gp_layer1 = gpflux.layers.GPLayer(  # type: ignore
+    gp_layer1 = GPLayer(
         kernel1,
         inducing_variable1,
         num_data=num_data,
@@ -101,7 +199,7 @@ def create_two_layer_GPAM_from_scratch(
     inducing_variable2 = gpflow.inducing_variables.InducingPoints(
         np.random.rand(num_inducing, n_latent)
     )
-    gp_layer2 = gpflux.layers.GPLayer(  # type: ignore
+    gp_layer2 = GPLayer(
         kernel2,
         inducing_variable2,
         num_data=num_data,
@@ -109,16 +207,14 @@ def create_two_layer_GPAM_from_scratch(
         mean_function=gpflow.mean_functions.Zero(),
     )
 
-    likelihood_layer = gpflux.layers.LikelihoodLayer(gpflow.likelihoods.Gaussian(0.1))  # type: ignore
-    two_layer_dgp = gpflux.models.DeepGP([gp_layer1, gp_layer2], likelihood_layer)  # type: ignore
-    model = two_layer_dgp.as_training_model()
-    model.compile("adam")
+    likelihood_layer = gpflow.likelihoods.Gaussian(0.1)
+    model = NativeDeepGP([gp_layer1, gp_layer2], likelihood_layer)
+    model.compile(optimizer="adam")
 
     if return_layers:
         return model, gp_layer1, gp_layer2
     else:
         return model
-
 
 def model_inference(
     data: npt.NDArray[np.float64], encoder: t.Any, batch_size: int = 20000
@@ -148,3 +244,4 @@ def model_inference(
         vars.append(res.variance())
 
     return np.concatenate(means, axis=0), np.concatenate(vars, axis=0)
+
