@@ -27,7 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Testing & Analysis
     "corner>=2.2.1",
+    # Documentation (MkDocs)
     "mkdocs-gen-files",
     "mkdocs-jupyter",
     "mkdocs-literate-nav",
@@ -36,12 +38,14 @@ dev = [
     "mkdocs-toc-md",
     "mkdocstrings",
     "mkdocstrings-python",
+    # Linting & Types
     "mypy",
     "pre-commit",
     "pytest",
     "pytest-cov",
-    "python-semantic-release",
     "ruff",
+    # CI/CD & Build
+    "python-semantic-release",
     "setuptools",
 ]
 
