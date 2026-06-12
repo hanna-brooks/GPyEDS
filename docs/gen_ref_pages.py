@@ -32,3 +32,27 @@ for path in sorted(src.rglob("*.py")):
 
 with mkdocs_gen_files.open("reference/SUMMARY.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())
+
+import tomllib
+
+# Generate cite.md with current version
+with open(root / "pyproject.toml", "rb") as f:
+    pyproject = tomllib.load(f)
+    version = pyproject["project"]["version"]
+
+cite_content = f"""# How to cite
+
+Please cite using the following:
+
+	norberttoth398. (2024). norberttoth398/GPyEDS: GPyEDS v{version} ({version}). Zenodo. https://doi.org/10.5281/zenodo.13837097
+"""
+with mkdocs_gen_files.open("cite.md", "w") as f:
+    f.write(cite_content)
+
+# Generate licence.md from root LICENSE
+with open(root / "LICENSE", "r") as f:
+    license_content = f.read()
+
+with mkdocs_gen_files.open("licence.md", "w") as f:
+    f.write(license_content)
+
