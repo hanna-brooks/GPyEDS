@@ -31,7 +31,6 @@ This project relies on the following open source packages:
 | flatbuffers | ![License](https://img.shields.io/badge/License-Apache%20Software%20License-blue.svg) Apache Software License |
 | gast | ![License](https://img.shields.io/badge/License-BSD%20License-blue.svg) BSD License |
 | gpflow | ![License](https://img.shields.io/badge/License-Apache%20Software%20License-blue.svg) Apache Software License |
-| gpflux | ![License](https://img.shields.io/badge/License-Apache%20Software%20License-blue.svg) Apache Software License |
 | idna | ![License](https://img.shields.io/badge/License-Unknown-blue.svg) Unknown |
 | importlib-metadata | ![License](https://img.shields.io/badge/License-Unknown-blue.svg) Unknown |
 | importlib-resources | ![License](https://img.shields.io/badge/License-Apache%20Software%20License-blue.svg) Apache Software License |

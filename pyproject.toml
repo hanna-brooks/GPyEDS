@@ -73,7 +73,6 @@ ignore = [
 ignore_missing_imports = true
 strict = true
 overrides = [
-    { module = "gpflux.*", ignore_errors = true },
     { module = "gpflow.*", ignore_errors = true },
 ]
 

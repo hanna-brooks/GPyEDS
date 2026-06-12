@@ -12,7 +12,8 @@ build/
 dist/
 .venv/
 *.egg-info/
-*.whl*.pkl
+*.whl
+*.pkl
 *.h5
 
 .claude/
