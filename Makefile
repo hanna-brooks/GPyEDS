@@ -22,3 +22,8 @@ docs: ## Serve MkDocs documentation locally
 
 build: ## Build the Python package
 	uv build
+
+# Catch-all target: route all unknown targets to help
+%:
+	@echo "Unknown target: $@. Redirecting to help..."
+	@$(MAKE) help

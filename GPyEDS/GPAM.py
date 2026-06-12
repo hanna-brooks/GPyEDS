@@ -50,9 +50,7 @@ class GPLayer(gpflow.Module):
         self.kernel = kernel
         self.inducing_variable = inducing_variable
         self.mean_function = (
-            mean_function
-            if mean_function is not None
-            else gpflow.mean_functions.Zero()
+            mean_function if mean_function is not None else gpflow.mean_functions.Zero()
         )
         self.num_data = tf.cast(num_data, t.cast(tf.DType, gpflow.default_float()))
 
@@ -81,9 +79,7 @@ class GPLayer(gpflow.Module):
             whiten=True,
         )
 
-    def conditional(
-        self, inputs: TensorType
-    ) -> tuple[TensorType, TensorType]:
+    def conditional(self, inputs: TensorType) -> tuple[TensorType, TensorType]:
         """Compute the conditional mean and variance at *inputs*."""
         f_mean, f_var = gpflow.conditionals.conditional(
             inputs,
@@ -199,10 +195,7 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
 
         # KL[q(u) || p(u)] / N  for each layer
         kl_loss = tf.reduce_sum(
-            [
-                layer.prior_kl() / layer.num_data
-                for layer in self.gp_layers_list
-            ]
+            [layer.prior_kl() / layer.num_data for layer in self.gp_layers_list]
         )
 
         loss = -ell + kl_loss
@@ -256,9 +249,7 @@ def create_two_layer_GPAM_from_data(
     z_indices = np.random.choice(num_data, size=num_inducing, replace=False)
     inducing_z = input_data[z_indices].copy()
 
-    kernel1 = gpflow.kernels.SquaredExponential(
-        lengthscales=[1] * input_data.shape[1]
-    )
+    kernel1 = gpflow.kernels.SquaredExponential(lengthscales=[1] * input_data.shape[1])
     inducing_variable1 = gpflow.inducing_variables.InducingPoints(inducing_z)
     gp_layer1 = GPLayer(
         kernel1,

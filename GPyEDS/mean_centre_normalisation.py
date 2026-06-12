@@ -6,7 +6,10 @@ import numpy.typing as npt
 
 def mean_centre(
     feature: npt.NDArray[np.float64], return_params: bool = False
-) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], list[npt.NDArray[np.float64]]]:
+) -> (
+    npt.NDArray[np.float64]
+    | tuple[npt.NDArray[np.float64], list[npt.NDArray[np.float64]]]
+):
     """Perform mean centralisation - simply just subtracts mean.
 
     Args:

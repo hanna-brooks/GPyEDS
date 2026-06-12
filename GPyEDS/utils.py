@@ -582,7 +582,10 @@ def decompose(
     data_mask: npt.NDArray[np.bool_] | None = None,
     df_shape: list[int] | None = None,
     smooth: int | None = None,
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]] | tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], t.Any, t.Any]:
+) -> (
+    tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]
+    | tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], t.Any, t.Any]
+):
     """
     Function to perform the selected decomposition algorithm on the data passed. Ideal for use in
     the initial data exploration steps.

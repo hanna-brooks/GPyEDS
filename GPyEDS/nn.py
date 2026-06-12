@@ -30,11 +30,7 @@ def create_nn_AE(
     enc_list: list[tf.keras.layers.Layer] = []
     for i in range(len(hidden)):
         if i == 0:
-            enc_list.append(
-                tf.keras.layers.Dense(
-                    hidden[i], activation=activation
-                )
-            )
+            enc_list.append(tf.keras.layers.Dense(hidden[i], activation=activation))
         else:
             enc_list.append(tf.keras.layers.Dense(hidden[i], activation=activation))
         enc_list.append(tf.keras.layers.LayerNormalization())
