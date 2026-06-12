@@ -107,3 +107,9 @@ scikit-image = [
 scikit-learn = [
     "sklearn",
 ]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:.*uses PyType_Spec with a metaclass.*:DeprecationWarning",
+    "ignore:.*distutils Version classes are deprecated.*:DeprecationWarning",
+]

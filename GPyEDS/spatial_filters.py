@@ -46,7 +46,8 @@ def linear_filter(
         pmask, np.asarray(filter), boundary="symm", mode="same"
     )
 
-    r = np.divide(np.multiply(meanres, pmask), maskres)
+    numerator = np.multiply(meanres, pmask)
+    r = np.divide(numerator, maskres, out=np.zeros_like(numerator), where=maskres != 0)
     r[~pmask.astype("bool")] = np.nan
     return r[range_:-range_, range_:-range_]
 

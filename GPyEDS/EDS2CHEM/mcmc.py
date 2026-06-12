@@ -406,7 +406,7 @@ def MCMC_run(  # type: ignore
 
     print(soln.x)
 
-    from multiprocessing import Pool
+    import multiprocessing
 
     import emcee
 
@@ -416,7 +416,7 @@ def MCMC_run(  # type: ignore
     filename = str(name) + ".h5"
     backend = emcee.backends.HDFBackend(filename)
     backend.reset(nwalkers, ndim)
-    with Pool() as pool:
+    with multiprocessing.get_context("spawn").Pool() as pool:
         sampler = emcee.EnsembleSampler(
             nwalkers,
             ndim,
@@ -477,7 +477,7 @@ def Simple_MCMC_run(  # type: ignore
 
     print(soln.x)
 
-    from multiprocessing import Pool
+    import multiprocessing
 
     import emcee
 
@@ -487,7 +487,7 @@ def Simple_MCMC_run(  # type: ignore
     filename = str(name) + ".h5"
     backend = emcee.backends.HDFBackend(filename)
     backend.reset(nwalkers, ndim)
-    with Pool() as pool:
+    with multiprocessing.get_context("spawn").Pool() as pool:
         sampler = emcee.EnsembleSampler(
             nwalkers,
             ndim,

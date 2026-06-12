@@ -14,9 +14,9 @@ import numpy as np
 import numpy.typing as npt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tqdm
 from gpflow.base import TensorType
-
-tfd = tfp.distributions
+from tensorflow_probability import distributions as tfd
 
 
 class GPLayer(gpflow.Module):
@@ -56,14 +56,14 @@ class GPLayer(gpflow.Module):
         )
         self.num_data = tf.cast(num_data, gpflow.default_float())
 
-        num_inducing = self.inducing_variable.num_inducing
+        num_inducing = t.cast(int, self.inducing_variable.num_inducing)
         self.q_mu = tf.Variable(
             np.zeros((num_inducing, self.num_latent_gps)),
             dtype=gpflow.default_float(),
             name="q_mu",
         )
 
-        q_sqrt_init = np.array(
+        q_sqrt_init: npt.NDArray[np.float64] = np.array(
             [np.eye(num_inducing) for _ in range(self.num_latent_gps)],
             dtype=gpflow.default_float(),
         )
@@ -119,7 +119,7 @@ class GPLayer(gpflow.Module):
         return tfd.Normal(loc=f_mean, scale=tf.sqrt(f_var))
 
 
-class NativeDeepGP(tf.keras.Model):
+class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
     """Keras model wrapping a stack of :class:`GPLayer` and a likelihood.
 
     The training objective is the evidence lower bound (ELBO):
@@ -143,7 +143,7 @@ class NativeDeepGP(tf.keras.Model):
         self.likelihood = likelihood
 
     @property
-    def trainable_variables(self) -> list[tf.Variable]:  # type: ignore[override]
+    def trainable_variables(self) -> list[tf.Variable]:
         all_vars: list[tf.Variable] = []
         for layer in self.gp_layers_list:
             all_vars.extend(layer.trainable_variables)
@@ -156,7 +156,7 @@ class NativeDeepGP(tf.keras.Model):
         x: TensorType | tfd.Distribution = inputs
         for layer in self.gp_layers_list:
             x = layer(x, training=training)
-        return x  # type: ignore[return-value]
+        return x
 
     # --------------------------------------------------------------------- #
     #  Helpers for unpacking the various data formats Keras may pass us.     #
@@ -360,9 +360,6 @@ def model_inference(
     Returns:
         ``(means, variances)`` — each of shape ``(N, L)``.
     """
-    import tqdm
-
-    import tqdm
 
     means = []
     variances = []
