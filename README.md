@@ -1,5 +1,5 @@
 # GPyEDS
-[![codecov](https://codecov.io/gh/norberttoth398/GPyEDS/graph/badge.svg?token=I4Ukc39QBJ)](https://codecov.io/gh/norberttoth398/GPyEDS) [![Documentation Status](https://readthedocs.org/projects/gpyeds/badge/?version=latest)](https://gpyeds.readthedocs.io/en/latest/?badge=latest) [![DOI](https://img.shields.io/zenodo/doi/13837097.svg)](https://doi.org/10.5281/zenodo.13837097)
+[![codecov](https://codecov.io/gh/norberttoth398/GPyEDS/graph/badge.svg?token=I4Ukc39QBJ)](https://codecov.io/gh/norberttoth398/GPyEDS) [![Documentation Status](https://readthedocs.org/projects/gpyeds/badge/?version=latest)](https://gpyeds.readthedocs.io/en/latest/?badge=latest) [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.13837097-green?style=flat)](https://doi.org/10.5281/zenodo.13837097) [![GitHub Release](https://img.shields.io/github/v/release/norberttoth398/GPyEDS?style=flat)](https://github.com/norberttoth398/GPyEDS/releases) [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 GPyEDS is a Python toolbox for the analysis of Energy Dispersive X-ray Spectroscopy (EDS) or other hyperspectral data sets. It leverages Gaussian Processes and Neural Network Autoencoders to provide robust spatial-spectral segmentation, preprocessing, and calibration workflows.
 
 ## Installation
