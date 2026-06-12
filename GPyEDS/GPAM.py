@@ -362,15 +362,13 @@ def model_inference(
     """
     import tqdm
 
-    max_iter = len(data) / batch_size
+    import tqdm
+
     means = []
     variances = []
-    for i in tqdm.tqdm(range(int(max_iter) + 1)):
-        if max_iter - i < 0:
-            res = encoder(data[batch_size * i :])
-        else:
-            res = encoder(data[batch_size * i : batch_size * (i + 1)])
-
+    # Loop over the data in chunks of batch_size, handling perfect division cleanly without an empty slice
+    for i in tqdm.tqdm(range(0, len(data), batch_size)):
+        res = encoder(data[i : i + batch_size])
         means.append(res.mean())
         variances.append(res.variance())
 
