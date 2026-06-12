@@ -150,8 +150,8 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
         all_vars.extend(self.likelihood.trainable_variables)
         return list({v.ref(): v for v in all_vars}.values())
 
-    def call(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, inputs: TensorType, training: bool | None = None
+    def call(
+        self, inputs: t.Any, training: bool | None = None, mask: t.Any | None = None
     ) -> tfd.Normal:
         x: TensorType | tfd.Distribution = inputs
         for layer in self.gp_layers_list:
@@ -220,7 +220,7 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
             self.optimizer.apply_gradients(zip(grads, trainable_vars))
         return {"loss": loss, "ell": ell, "kl": kl_loss}
 
-    def test_step(self, data: t.Any) -> dict[str, tf.Tensor]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def test_step(self, data: t.Any) -> dict[str, t.Any]:
         x, y = self._unpack_data(data)
         loss, ell, kl_loss = self._compute_elbo(x, y, training=False)
         return {"loss": loss, "ell": ell, "kl": kl_loss}

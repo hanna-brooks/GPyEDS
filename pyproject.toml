@@ -112,4 +112,10 @@ scikit-learn = [
 filterwarnings = [
     "ignore:.*uses PyType_Spec with a metaclass.*:DeprecationWarning",
     "ignore:.*distutils Version classes are deprecated.*:DeprecationWarning",
+    "ignore:.*invalid value encountered in scalar subtract.*:RuntimeWarning",
+]
+
+[tool.pyright]
+exclude = [
+    "**/__pyrefly_virtual__/**",
 ]
