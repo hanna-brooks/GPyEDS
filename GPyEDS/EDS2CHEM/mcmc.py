@@ -373,6 +373,7 @@ def MCMC_run(  # type: ignore
     num_iter: int = 10000,
     return_: bool = False,
     name: str = "mcmc",
+    output_path: str = "emcee_res.pkl",
 ) -> t.Any | None:
     """_summary_
 
@@ -429,7 +430,7 @@ def MCMC_run(  # type: ignore
     samples = sampler.get_chain()
     import pickle
 
-    with open("emcee_res.pkl", "wb") as f:
+    with open(output_path, "wb") as f:
         pickle.dump(samples, f)
 
     if return_ is True:
@@ -446,6 +447,7 @@ def Simple_MCMC_run(  # type: ignore
     num_iter: int = 10000,
     return_: bool = False,
     name: str = "mcmc",
+    output_path: str = "emcee_res.pkl",
 ) -> t.Any | None:
     """_summary_
 
@@ -499,7 +501,7 @@ def Simple_MCMC_run(  # type: ignore
     samples = sampler.get_chain()
     import pickle
 
-    with open("emcee_res.pkl", "wb") as f:
+    with open(output_path, "wb") as f:
         pickle.dump(samples, f)
 
     if return_ is True:
