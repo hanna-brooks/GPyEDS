@@ -54,12 +54,12 @@ class GPLayer(gpflow.Module):
             if mean_function is not None
             else gpflow.mean_functions.Zero()
         )
-        self.num_data = tf.cast(num_data, gpflow.default_float())
+        self.num_data = tf.cast(num_data, t.cast(tf.DType, gpflow.default_float()))
 
         num_inducing = t.cast(int, self.inducing_variable.num_inducing)
         self.q_mu = tf.Variable(
-            np.zeros((num_inducing, self.num_latent_gps)),
-            dtype=gpflow.default_float(),
+            t.cast(t.Any, np.zeros((num_inducing, self.num_latent_gps))),
+            dtype=t.cast(tf.DType, gpflow.default_float()),
             name="q_mu",
         )
 
@@ -114,9 +114,9 @@ class GPLayer(gpflow.Module):
         else:
             samples = inputs
 
-        samples = tf.cast(samples, gpflow.default_float())
+        samples = tf.cast(samples, t.cast(tf.DType, gpflow.default_float()))
         f_mean, f_var = self.conditional(samples)
-        return tfd.Normal(loc=f_mean, scale=tf.sqrt(f_var))
+        return tfd.Normal(loc=f_mean, scale=tf.sqrt(t.cast(t.Any, f_var)))
 
 
 class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
@@ -150,7 +150,7 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
         all_vars.extend(self.likelihood.trainable_variables)
         return list({v.ref(): v for v in all_vars}.values())
 
-    def call(
+    def call(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, inputs: TensorType, training: bool | None = None
     ) -> tfd.Normal:
         x: TensorType | tfd.Distribution = inputs
@@ -180,8 +180,8 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
             y = data
 
         return (
-            tf.cast(x, gpflow.default_float()),
-            tf.cast(y, gpflow.default_float()),
+            tf.cast(x, t.cast(tf.DType, gpflow.default_float())),
+            tf.cast(y, t.cast(tf.DType, gpflow.default_float())),
         )
 
     def _compute_elbo(
@@ -216,10 +216,11 @@ class NativeDeepGP(tf.keras.Model):  # type: ignore[misc]
 
         trainable_vars = self.trainable_variables
         grads = tape.gradient(loss, trainable_vars)
-        self.optimizer.apply_gradients(zip(grads, trainable_vars))
+        if self.optimizer is not None:
+            self.optimizer.apply_gradients(zip(grads, trainable_vars))
         return {"loss": loss, "ell": ell, "kl": kl_loss}
 
-    def test_step(self, data: t.Any) -> dict[str, tf.Tensor]:
+    def test_step(self, data: t.Any) -> dict[str, tf.Tensor]:  # pyright: ignore[reportIncompatibleMethodOverride]
         x, y = self._unpack_data(data)
         loss, ell, kl_loss = self._compute_elbo(x, y, training=False)
         return {"loss": loss, "ell": ell, "kl": kl_loss}
