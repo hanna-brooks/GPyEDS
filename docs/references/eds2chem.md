@@ -1,3 +1,0 @@
-# EDS2CHEM
-
-::: GPyEDS.EDS2CHEM.mcmc.MCMC_run

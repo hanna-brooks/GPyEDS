@@ -23,3 +23,23 @@ jobs:
         uses: python-semantic-release/python-semantic-release@v9.8.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        if: steps.release.outputs.released == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        if: steps.release.outputs.released == 'true'
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        if: steps.release.outputs.released == 'true'
+        run: uv sync --all-extras
+
+      - name: Deploy MkDocs to GitHub Pages
+        if: steps.release.outputs.released == 'true'
+        run: uv run mkdocs gh-deploy --force

@@ -94,6 +94,13 @@ dependencies = [
     "mypy",
     "pre-commit",
     "python-semantic-release",
+    "pytest",
+    "pytest-cov",
+    "setuptools",
+    "mkdocs-material",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
 ]
 
 [tool.ruff]

@@ -2,3 +2,14 @@
 __pycache__
 *.icloud
 .ipynb_checkpoints
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+site/
+build/
+dist/
+.venv/
+*.egg-info/
+*.whl

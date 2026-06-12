@@ -3,13 +3,40 @@ site_name: GPyEDS
 copyright: Copyright (c) 2024 Norbert Toth
 
 theme:
-    name: readthedocs
-    highlightjs: true
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.indexes
+    - toc.integrate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
 
 plugins:
   - search
-  - mkdocstrings
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            heading_level: 2
   - mkdocs-jupyter
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
 
 nav:
   - GPyEDS: index.md
@@ -26,12 +53,6 @@ nav:
     - QEMSCAN Data: Examples/QEMSCAN_build_data.ipynb
     - Segmentation: Examples/Segmentation.ipynb
     - EDS2CHEM Calibration: Examples/EDS2CHEM_example.ipynb
-  - References:
-    - GPAM: references/gpam.md
-    - Normalisation: references/mcn.md
-    - Neural Network: references/nn.md
-    - Spatial Filters: references/spatial_filters.md
-    - Utils: references/utils.md
-    - EDS2CHEM: references/eds2chem.md
+  - API Reference: reference/
   - Licence:
-    Licence: licence.md
+    - Licence: licence.md
