@@ -1,4 +1,4 @@
-.PHONY: help install lint format test docs build
+.PHONY: help install lint format test docs build clean package
 
 help:  ## Show this help menu
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -23,6 +23,10 @@ docs: ## Serve MkDocs documentation locally
 build: ## Build the Python package
 	uv build
 
+clean: ## Clean build artifacts
+	rm -rf dist/ build/ *.egg-info
+
+package: clean build ## Clean and prepare the Python package for distribution
 # Catch-all target: route all unknown targets to help
 %:
 	@echo "Unknown target: $@. Redirecting to help..."
