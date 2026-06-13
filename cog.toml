@@ -1,0 +1,9 @@
+from_latest_tag = true
+ignore_merge_commits = true
+
+[bump_profiles]
+
+[pre_bump_hooks]
+bump_version = "sed -i 's/^version = \".*\"/version = \"{{version}}\"/' pyproject.toml"
+
+[post_bump_hooks]
