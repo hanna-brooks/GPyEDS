@@ -1,45 +1,60 @@
-name: Semantic Release
+name: Conventional Commits CI/CD
 
 on:
   push:
     branches:
       - main
-
-permissions:
-  contents: write
-  id-token: write
+  pull_request:
 
 jobs:
-  release:
+  check-commits:
     runs-on: ubuntu-latest
-    concurrency: release
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Python Semantic Release
-        id: release
-        uses: python-semantic-release/python-semantic-release@v9.8.1
+          
+      - name: Verify Conventional Commits compliance
+        uses: cocogitto/cocogitto-action@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          check: true
 
+  release:
+    needs: check-commits
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Perform SemVer Release
+        uses: cocogitto/cocogitto-action@v3
+        id: release
+        with:
+          release: true
+          git-user: 'Cog Bot'
+          git-user-email: 'bot@gpyeds.local'
+          
       - name: Set up Python
-        if: steps.release.outputs.released == 'true'
+        if: steps.release.outputs.version != ''
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install uv
-        if: steps.release.outputs.released == 'true'
+        if: steps.release.outputs.version != ''
         uses: astral-sh/setup-uv@v2
         with:
           version: "latest"
 
       - name: Install dependencies
-        if: steps.release.outputs.released == 'true'
+        if: steps.release.outputs.version != ''
         run: uv sync --all-extras
 
       - name: Deploy MkDocs to GitHub Pages
-        if: steps.release.outputs.released == 'true'
+        if: steps.release.outputs.version != ''
         run: uv run mkdocs gh-deploy --force
